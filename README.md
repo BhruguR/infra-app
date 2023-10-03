@@ -1,5 +1,5 @@
 # Getting started
 
-This repository is a sample application for users following the getting started guide at https://docs.docker.com/get-started/.
+This repository is an extension of the docker's getting-started-app in docker's documentation. 
 
-The application is based on the application from the getting started tutorial at https://github.com/docker/getting-started
+The sole purpose of this app is for me to learn and implement IaC concepts, along with other DevOps / SRE best practices

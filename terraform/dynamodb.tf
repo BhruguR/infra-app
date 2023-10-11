@@ -8,10 +8,12 @@ provider "aws" {
   endpoints {
     dynamodb = "http://localhost:4566"
     apigateway = "http://localhost:4566"
-    lambda = "http://localhost:4574"
+    lambda = "http://localhost:4566"
+    iam = "http://localhost:4566"
   }
 }
 
+#DynamoDB
 resource "aws_dynamodb_table" "example" {
   name           = "example"
   read_capacity  = 20
@@ -24,6 +26,7 @@ resource "aws_dynamodb_table" "example" {
   }
 }
 
+#API GATEWAY
 resource "aws_api_gateway_rest_api" "gateway" {
   name        = "gateway"
   description = "This is my API for demonstration purposes"
@@ -40,4 +43,75 @@ resource "aws_api_gateway_method" "gatewayMethod" {
   resource_id   = aws_api_gateway_resource.gatewayResource.id
   http_method   = "POST"
   authorization = "NONE"
+}
+
+resource "aws_api_gateway_domain_name" "dom" {
+  domain_name     = "localhost:3000"
+}
+
+resource "aws_api_gateway_base_path_mapping" "domain" {
+  api_id      = aws_api_gateway_rest_api.gateway.id
+  domain_name = aws_api_gateway_domain_name.dom.domain_name
+}
+
+resource "aws_iam_role" "lambda_role" {
+  name = "lambda_it_out"
+  assume_role_policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Action": "sts:AssumeRole",
+     "Principal": {
+       "Service": "lambda.amazonaws.com"
+     },
+     "Effect": "Allow",
+     "Sid": ""
+   }
+ ]
+}
+EOF
+}
+
+resource "aws_iam_policy" "iam_policy_for_lambda" {
+ 
+ name         = "aws_iam_policy_for_terraform_aws_lambda_role"
+ path         = "/"
+ description  = "AWS IAM Policy for managing aws lambda role"
+ policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Action": [
+       "logs:CreateLogGroup",
+       "logs:CreateLogStream",
+       "logs:PutLogEvents"
+     ],
+     "Resource": "arn:aws:logs:*:*:*",
+     "Effect": "Allow"
+   }
+ ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "attach_iam_policy_to_iam_role" {
+ role        = aws_iam_role.lambda_role.name
+ policy_arn  = aws_iam_policy.iam_policy_for_lambda.arn
+}
+
+data "archive_file" "zip_the_python_code" {
+type        = "zip"
+source_dir  = "${path.module}/python/"
+output_path = "${path.module}/python/lambda.zip"
+}
+
+resource "aws_lambda_function" "terraform_lambda_func" {
+filename                       = "${path.module}/python/lambda.zip"
+function_name                  = "Lambda_Function"
+role                           = aws_iam_role.lambda_role.arn
+handler                        = "index.lambda_handler"
+runtime                        = "python3.8"
+depends_on                     = [aws_iam_role_policy_attachment.attach_iam_policy_to_iam_role]
 }
